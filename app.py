@@ -92,7 +92,7 @@ def call_gemini_api(child_name, theme, story_format):
         f"based on the theme '{theme}'. Make it engaging, age-appropriate, and imaginative."
     )
     try:
-        model = genai.GenerativeModel("models/gemini-1.5-pro-002")
+        model = genai.GenerativeModel("models/gemini-2.0-flash")
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
