@@ -5,6 +5,9 @@ import azure.cognitiveservices.speech as speechsdk
 import os
 from translate import Translator
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -85,7 +88,7 @@ def translate_story():
     return {"story": translated_story}
 
 def call_gemini_api(child_name, theme, story_format):
-    GEMINI_API_KEY = "AIzaSyBO1q1fKiln6Rydf9ULuI8Ajma7ykMgKzw"
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     genai.configure(api_key=GEMINI_API_KEY)
     prompt = (
         f"Write a {story_format.lower()} story for a child named {child_name} "
@@ -99,8 +102,8 @@ def call_gemini_api(child_name, theme, story_format):
         return f"Error generating story: {str(e)}"
 
 def text_to_speech(text, filename, language_code="en-US", style="cheerful"):
-    speech_key = "CDA5WaCFwlpTHsX77yCuJlGcoJxoFQDsfYGDW8DamFJbMOh6XzXPJQQJ99BCACGhslBXJ3w3AAAYACOGKPQZ"
-    service_region = "centralindia"
+    service_region = os.getenv("AZURE_SPEECH_REGION", "centralindia")
+    speech_key = os.getenv("AZURE_SPEECH_KEY")
 
     speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=service_region)
     audio_config = speechsdk.audio.AudioOutputConfig(filename=filename)
