@@ -1,2 +1,6 @@
 Flask==2.3.2
 requests==2.31.0
+google-generativeai>=0.3.0
+azure-cognitiveservices-speech>=1.25.0
+translate>=3.6.1
+gunicorn>=20.1.0

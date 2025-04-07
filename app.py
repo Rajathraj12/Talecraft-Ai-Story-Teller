@@ -9,7 +9,6 @@ import time
 app = Flask(__name__)
 
 STORIES_FILE = "data/stories.json"
-
 def load_stories():
     try:
         with open(STORIES_FILE, "r") as file:
@@ -159,7 +158,7 @@ def translate_text(text, target_language="hi"):
     translated_chunks = [translator.translate(chunk) for chunk in chunks]
     return " ".join(translated_chunks)
 
-if __name__ == "__main__":
-    if not os.path.exists("static/audio"):
-        os.makedirs("static/audio")
-    app.run(debug=True)
+# if __name__ == "__main__":
+#     if not os.path.exists("static/audio"):
+#         os.makedirs("static/audio")
+#     app.run(debug=True)
