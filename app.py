@@ -6,20 +6,21 @@ import os
 from translate import Translator
 import time
 from dotenv import load_dotenv
+import requests
+import urllib3
+import ssl
 
+# Load environment variables from .env file
 load_dotenv()
+
+# Configure for SSL certificate issues
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Create model instance
-model = genai.GenerativeModel("models/gemini-2.0-flash")
-
-# Test the model
-response = model.generate_content("Write a short story about friendship")
-print(response.text)
-
+# Initialize Flask app
 app = Flask(__name__)
 
 # Configure server to handle larger request lines
@@ -102,14 +103,18 @@ def translate_story():
     return {"story": translated_story}
 
 def call_gemini_api(child_name, theme, story_format):
-    prompt = (
-        f"Write a {story_format.lower()} story for a child named {child_name} "
-        f"based on the theme '{theme}'. Make it engaging, age-appropriate, and imaginative."
-    )
     try:
+        # Create model instance - moved from global scope to function
+        model = genai.GenerativeModel("models/gemini-2.0-flash")
+        
+        prompt = (
+            f"Write a {story_format.lower()} story for a child named {child_name} "
+            f"based on the theme '{theme}'. Make it engaging, age-appropriate, and imaginative."
+        )
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
+        print(f"Gemini API error: {str(e)}")
         return f"Error generating story: {str(e)}"
 
 def text_to_speech(text, filename, language_code="en-US", style="cheerful"):
@@ -182,14 +187,42 @@ def translate_text(text, target_language="hi"):
     }
     
     # Step 2: Perform the actual translation
-    translator = Translator(to_lang=target_language)
-    translated_chunks = []
-    
-    print(f"Processing translation {translation_id} from English to {target_language}...")
-    for i, chunk in enumerate(chunks):
-        translated_chunk = translator.translate(chunk)
-        translated_chunks.append(translated_chunk)
-        print(f"Chunk {i+1}/{len(chunks)} translated")
+    try:
+        # Create a custom session with verification disabled to handle SSL issues
+        session = requests.Session()
+        session.verify = False
+        
+        # Create a custom translation function that uses our session
+        def custom_translate(chunk):
+            url = "https://api.mymemory.translated.net/get"
+            params = {
+                "q": chunk,
+                "langpair": f"en|{target_language}"
+            }
+            try:
+                response = session.get(url, params=params)
+                data = response.json()
+                if data and "responseData" in data and "translatedText" in data["responseData"]:
+                    return data["responseData"]["translatedText"]
+                else:
+                    print(f"Translation failed for chunk: {chunk[:30]}...")
+                    return chunk  # Return original text if translation fails
+            except Exception as e:
+                print(f"Translation error: {str(e)}")
+                return chunk  # Return original text if error occurs
+        
+        # Translate using our custom function
+        translated_chunks = []
+        print(f"Processing translation {translation_id} from English to {target_language}...")
+        for i, chunk in enumerate(chunks):
+            translated_chunk = custom_translate(chunk)
+            translated_chunks.append(translated_chunk)
+            print(f"Chunk {i+1}/{len(chunks)} translated")
+        
+    except Exception as e:
+        print(f"Error setting up translation: {str(e)}")
+        # Fallback to original text if entire translation process fails
+        return text
     
     # Step 3: Store the translated chunks
     translation_record["translated_chunks"] = translated_chunks
@@ -200,10 +233,11 @@ def translate_text(text, target_language="hi"):
     
     return translation_record["final_translation"]
 
-# if __name__ == "__main__":
-#     if not os.path.exists("static/audio"):
-#         os.makedirs("static/audio")
-#     app.run(debug=True, threaded=True, use_reloader=True, 
-#             host='0.0.0.0', 
-#             port=5000,
-#             request_handler=lambda wsgi_app: app.wsgi_app)
+if __name__ == "__main__":
+    if not os.path.exists("static/audio"):
+        os.makedirs("static/audio")
+    # Add a print statement for debugging
+    print("Starting TaleCraft AI Story Teller application...")
+    app.run(debug=True, threaded=True, use_reloader=True, 
+            host='0.0.0.0', 
+            port=5000)
