@@ -84,10 +84,15 @@
             let originalStory = `{{ story|safe }}`; // Store the original story in English
             let isTranslating = false;
             
-            const isHindiSelected = "{{ (request.form.get('language_code') == 'hi-IN') | tojson }}";
+            // Check if the story was generated in Hindi by checking the language code
+            const languageCode = "{{ request.form.get('language_code') }}";
+            const isHindiSelected = languageCode === "hi-IN";
             
-            // Hide translation buttons if Hindi was already selected
+            // Hide translation buttons only if Hindi was selected for listening
             document.addEventListener("DOMContentLoaded", () => {
+                console.log("Language code:", languageCode);
+                console.log("Is Hindi selected:", isHindiSelected);
+                
                 if (isHindiSelected) {
                     document.getElementById('translate-btn').style.display = 'none';
                     document.getElementById('revert-btn').style.display = 'none';
