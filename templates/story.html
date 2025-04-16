@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Story</title>
+    <style>
+        /* Add styles for the buttons */
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .translate-hindi {
+            background-color: #f4a261; /* Orange for Hindi translation */
+            color: white;
+        }
+        .translate-english {
+            background-color: #2a9d8f; /* Green for reverting to English */
+            color: white;
+        }
+        button:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    {% extends "base.html" %}
+
+    {% block content %}
+    <div class="max-w-3xl mx-auto bg-gray-100 rounded-lg p-6 ">
+        <h2 class="text-3xl font-bold text-green-700 mb-4">Here’s your story for {{ child_name }}:</h2>
+        <div id="story-content" class="prose max-w-none text-gray-800 whitespace-pre-line">
+            {{ story|safe }}
+        </div>
+        <br>
+        <button class="translate-hindi" onclick="changeLanguage('hi')">Translate to Hindi</button>
+        <button class="translate-english" onclick="changeLanguage('en')">Revert to English</button>
+        <p id="loading-message" style="color: blue; display: none;"></p>
+
+        <script>
+            let originalStory = `{{ story|safe }}`; // Store the original story in English
+
+            function changeLanguage(language) {
+                const loadingMessage = document.getElementById('loading-message');
+                const storyContent = document.getElementById('story-content');
+
+                // Show loading message
+                loadingMessage.style.display = 'block';
+                loadingMessage.textContent = `Your story is being translated to ${language === 'hi' ? 'Hindi' : 'English'}. Estimated time: 30 seconds...`;
+
+                // If reverting to English, use the original story
+                if (language === 'en') {
+                    storyContent.innerHTML = originalStory;
+                    loadingMessage.style.display = 'none';
+                    return;
+                }
+
+                // Fetch the translated story
+                fetch(`/translate_story?language=${language}&story=${encodeURIComponent(storyContent.innerText)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        storyContent.innerHTML = data.story;
+                        loadingMessage.style.display = 'none';
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        loadingMessage.textContent = 'An error occurred while translating the story.';
+                    });
+            }
+        </script>
+
+        {% if audio_file %}
+        <div class="mt-6">
+            <h3 class="text-xl text-green-600 font-semibold mb-2">Listen to the story:</h3>
+            <audio controls class="w-full">
+                <source src="{{ url_for('static', filename=audio_file.split('static/')[1]) }}" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+            <p class="mt-2">
+                <a href="{{ url_for('static', filename=audio_file.split('static/')[1]) }}" class="text-green-500 underline" download>
+                    Download Audio
+                </a>
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="text-center mt-6">
+        <a href="/" class="bg-green-700 hover:bg-green-800 text-white py-2 px-4 rounded font-semibold">
+            Create Another Story
+        </a>
+    </div>
+    {% endblock %}
+</body>
+</html>
