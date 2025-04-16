@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+<<<<<<< HEAD
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
@@ -25,6 +26,10 @@ app = Flask(__name__)
 # Configure server to handle larger request lines
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB limit for request content
 
+=======
+app = Flask(__name__)
+
+>>>>>>> origin/main
 STORIES_FILE = "data/stories.json"
 def load_stories():
     try:
@@ -86,10 +91,17 @@ def generate_story():
         audio_file=audio_path
     )
 
+<<<<<<< HEAD
 @app.route("/translate_story", methods=["POST"])
 def translate_story():
     language = request.form.get("language", "en")
     story = request.form.get("story", "")
+=======
+@app.route("/translate_story")
+def translate_story():
+    language = request.args.get("language", "en")
+    story = request.args.get("story", "")
+>>>>>>> origin/main
 
     estimated_time = (len(story) // 100) + 2
     time.sleep(estimated_time)
@@ -102,11 +114,20 @@ def translate_story():
     return {"story": translated_story}
 
 def call_gemini_api(child_name, theme, story_format):
+<<<<<<< HEAD
+=======
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    genai.configure(api_key=GEMINI_API_KEY)
+>>>>>>> origin/main
     prompt = (
         f"Write a {story_format.lower()} story for a child named {child_name} "
         f"based on the theme '{theme}'. Make it engaging, age-appropriate, and imaginative."
     )
     try:
+<<<<<<< HEAD
+=======
+        model = genai.GenerativeModel("models/gemini-2.0-flash")
+>>>>>>> origin/main
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
@@ -168,6 +189,7 @@ def generate_moral(theme):
 def translate_text(text, target_language="hi"):
     max_length = 500
     chunks = [text[i:i + max_length] for i in range(0, len(text), max_length)]
+<<<<<<< HEAD
     
     # Generate a unique ID for this translation
     translation_id = f"trans_{int(time.time())}"
@@ -199,11 +221,20 @@ def translate_text(text, target_language="hi"):
     print(f"Translation {translation_id} complete")
     
     return translation_record["final_translation"]
+=======
+    translator = Translator(to_lang=target_language)
+    translated_chunks = [translator.translate(chunk) for chunk in chunks]
+    return " ".join(translated_chunks)
+>>>>>>> origin/main
 
 # if __name__ == "__main__":
 #     if not os.path.exists("static/audio"):
 #         os.makedirs("static/audio")
+<<<<<<< HEAD
 #     app.run(debug=True, threaded=True, use_reloader=True, 
 #             host='0.0.0.0', 
 #             port=5000,
 #             request_handler=lambda wsgi_app: app.wsgi_app)
+=======
+#     app.run(debug=True)
+>>>>>>> origin/main
