@@ -59,6 +59,7 @@
                     return;
                 }
 
+<<<<<<< HEAD
                 // Create form data for POST request
                 const formData = new FormData();
                 formData.append('language', language);
@@ -69,6 +70,10 @@
                     method: 'POST',
                     body: formData
                 })
+=======
+                // Fetch the translated story
+                fetch(`/translate_story?language=${language}&story=${encodeURIComponent(storyContent.innerText)}`)
+>>>>>>> origin/main
                     .then(response => response.json())
                     .then(data => {
                         storyContent.innerHTML = data.story;
