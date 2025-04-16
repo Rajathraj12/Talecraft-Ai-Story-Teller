@@ -84,6 +84,16 @@
             let originalStory = `{{ story|safe }}`; // Store the original story in English
             let isTranslating = false;
             
+            const isHindiSelected = "{{ (request.form.get('language_code') == 'hi-IN') | tojson }}";
+            
+            // Hide translation buttons if Hindi was already selected
+            document.addEventListener("DOMContentLoaded", () => {
+                if (isHindiSelected) {
+                    document.getElementById('translate-btn').style.display = 'none';
+                    document.getElementById('revert-btn').style.display = 'none';
+                }
+            });
+            
             function changeLanguage(language) {
                 const translateBtn = document.getElementById('translate-btn');
                 const revertBtn = document.getElementById('revert-btn');

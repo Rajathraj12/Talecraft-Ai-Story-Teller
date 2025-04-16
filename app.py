@@ -279,11 +279,11 @@ def translate_text(text, target_language="hi"):
             # If all else fails, return original text
             return text
 
-if __name__ == "__main__":
-    if not os.path.exists("static/audio"):
-        os.makedirs("static/audio")
-    # Add a print statement for debugging
-    print("Starting TaleCraft AI Story Teller application...")
-    app.run(debug=True, threaded=True, use_reloader=True, 
-            host='0.0.0.0', 
-            port=5000)
+# if __name__ == "__main__":
+#     if not os.path.exists("static/audio"):
+#         os.makedirs("static/audio")
+#     # Add a print statement for debugging
+#     print("Starting TaleCraft AI Story Teller application...")
+#     app.run(debug=True, threaded=True, use_reloader=True, 
+#             host='0.0.0.0', 
+#             port=5000)
