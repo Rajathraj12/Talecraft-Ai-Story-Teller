@@ -25,6 +25,39 @@
         button:hover {
             opacity: 0.8;
         }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #2a9d8f;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .translation-progress {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e2f3f5;
+            border-radius: 5px;
+            display: none;
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #2a9d8f;
+            border-radius: 5px;
+            width: 0%;
+            transition: width 0.5s;
+        }
     </style>
 </head>
 <body>
@@ -37,47 +70,112 @@
             {{ story|safe }}
         </div>
         <br>
-        <button class="translate-hindi" onclick="changeLanguage('hi')">Translate to Hindi</button>
-        <button class="translate-english" onclick="changeLanguage('en')">Revert to English</button>
-        <p id="loading-message" style="color: blue; display: none;"></p>
+        <button id="translate-btn" class="translate-hindi" onclick="changeLanguage('hi')">Translate to Hindi</button>
+        <button id="revert-btn" class="translate-english" onclick="changeLanguage('en')">Revert to English</button>
+        
+        <div id="translation-progress" class="translation-progress">
+            <div id="progress-message"></div>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+        </div>
 
         <script>
             let originalStory = `{{ story|safe }}`; // Store the original story in English
-
+            let isTranslating = false;
+            
             function changeLanguage(language) {
-                const loadingMessage = document.getElementById('loading-message');
+                const translateBtn = document.getElementById('translate-btn');
+                const revertBtn = document.getElementById('revert-btn');
                 const storyContent = document.getElementById('story-content');
-
-                // Show loading message
-                loadingMessage.style.display = 'block';
-                loadingMessage.textContent = `Your story is being translated to ${language === 'hi' ? 'Hindi' : 'English'}. Estimated time: 30 seconds...`;
-
+                const progressDiv = document.getElementById('translation-progress');
+                const progressMessage = document.getElementById('progress-message');
+                const progressFill = document.getElementById('progress-fill');
+                
+                // Prevent multiple translation requests
+                if (isTranslating) {
+                    return;
+                }
+                
                 // If reverting to English, use the original story
                 if (language === 'en') {
                     storyContent.innerHTML = originalStory;
-                    loadingMessage.style.display = 'none';
                     return;
                 }
-
+                
+                // Show progress indicator
+                isTranslating = true;
+                progressDiv.style.display = 'block';
+                progressMessage.innerHTML = '<div class="spinner"></div> <span style="color: black;">Translating your story to Hindi...</span>';
+                progressFill.style.width = '10%';
+                
+                // Disable buttons during translation
+                translateBtn.disabled = true;
+                translateBtn.style.opacity = '0.5';
+                
                 // Create form data for POST request
                 const formData = new FormData();
                 formData.append('language', language);
                 formData.append('story', storyContent.innerText);
-
+                
+                // Show translation is in progress
+                const startTime = new Date().getTime();
+                
+                // Update progress animation
+                let progress = 10;
+                const progressInterval = setInterval(() => {
+                    if (progress < 90) {
+                        progress += 5;
+                        progressFill.style.width = `${progress}%`;
+                    }
+                }, 1000);
+                
                 // Fetch the translated story using POST
                 fetch('/translate_story', {
                     method: 'POST',
                     body: formData
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        storyContent.innerHTML = data.story;
-                        loadingMessage.style.display = 'none';
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        loadingMessage.textContent = 'An error occurred while translating the story.';
-                    });
+                .then(response => {
+                    // Show completed progress
+                    progressFill.style.width = '100%';
+                    clearInterval(progressInterval);
+                    return response.json();
+                })
+                .then(data => {
+                    // Calculate actual time taken
+                    const endTime = new Date().getTime();
+                    const timeTaken = Math.round((endTime - startTime) / 1000);
+                    
+                    // Update story with translation
+                    storyContent.innerHTML = data.story;
+                    
+                    // Update progress message with success
+                    progressMessage.innerHTML = `<span style="color: green;">✓</span> Translation completed in ${timeTaken} seconds!`;
+                    
+                    // Hide progress after 3 seconds
+                    setTimeout(() => {
+                        progressDiv.style.display = 'none';
+                    }, 3000);
+                    
+                    // Re-enable translation button
+                    isTranslating = false;
+                    translateBtn.disabled = false;
+                    translateBtn.style.opacity = '1';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    
+                    // Show error message
+                    progressMessage.innerHTML = '<span style="color: red;">✗</span> Translation failed. Please try again.';
+                    progressFill.style.width = '100%';
+                    progressFill.style.backgroundColor = '#e74c3c';
+                    
+                    // Re-enable translation button
+                    isTranslating = false;
+                    translateBtn.disabled = false;
+                    translateBtn.style.opacity = '1';
+                    clearInterval(progressInterval);
+                });
             }
         </script>
 

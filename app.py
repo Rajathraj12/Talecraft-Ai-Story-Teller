@@ -92,9 +92,6 @@ def translate_story():
     language = request.form.get("language", "en")
     story = request.form.get("story", "")
 
-    estimated_time = (len(story) // 100) + 2
-    time.sleep(estimated_time)
-
     if language == "hi":
         translated_story = translate_text(story, target_language="hi")
     else:
@@ -171,73 +168,122 @@ def generate_moral(theme):
     return morals.get(theme.lower(), "Always strive to do your best and learn from every experience.")
 
 def translate_text(text, target_language="hi"):
-    max_length = 500
-    chunks = [text[i:i + max_length] for i in range(0, len(text), max_length)]
-    
-    # Generate a unique ID for this translation
-    translation_id = f"trans_{int(time.time())}"
-    print(f"Translation ID: {translation_id}")
-    
-    # Step 1: Store original English text with ID
-    translation_record = {
-        "id": translation_id,
-        "original_text": text,
-        "english_chunks": chunks,
-        "timestamp": time.time()
+    # For very short text, use a simple dictionary to avoid API calls
+    common_translations = {
+        "hi": {
+            "once upon a time": "एक समय की बात है",
+            "the end": "अंत",
+            "moral of the story": "कहानी की शिक्षा",
+        }
     }
     
-    # Step 2: Perform the actual translation
+    # Simple cache to avoid translating the same text multiple times
+    # This helps during development and when users translate the same stories
+    cache_file = "data/translation_cache.json"
+    translation_cache = {}
+    
+    # Load cache if it exists
     try:
-        # Create a custom session with verification disabled to handle SSL issues
-        session = requests.Session()
-        session.verify = False
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                translation_cache = json.load(f)
+    except Exception as e:
+        print(f"Error loading translation cache: {e}")
+    
+    # Create a cache key
+    cache_key = f"{text[:50]}_{target_language}"
+    
+    # Check if translation is in cache
+    if cache_key in translation_cache:
+        print(f"Using cached translation for {cache_key[:20]}...")
+        return translation_cache[cache_key]
+    
+    # Use Gemini API for translations instead of external services
+    # This is more reliable and controlled within our rate limits
+    try:
+        # Only create the model when needed (not on import)
+        model = genai.GenerativeModel("models/gemini-2.0-flash")
         
-        # Create a custom translation function that uses our session
-        def custom_translate(chunk):
-            url = "https://api.mymemory.translated.net/get"
-            params = {
-                "q": chunk,
-                "langpair": f"en|{target_language}"
-            }
-            try:
-                response = session.get(url, params=params)
-                data = response.json()
-                if data and "responseData" in data and "translatedText" in data["responseData"]:
-                    return data["responseData"]["translatedText"]
-                else:
-                    print(f"Translation failed for chunk: {chunk[:30]}...")
-                    return chunk  # Return original text if translation fails
-            except Exception as e:
-                print(f"Translation error: {str(e)}")
-                return chunk  # Return original text if error occurs
+        # For longer texts, split into reasonable chunks
+        # Gemini handles context better than the external translation APIs
+        max_length = 750  # Increased from 500
         
-        # Translate using our custom function
-        translated_chunks = []
-        print(f"Processing translation {translation_id} from English to {target_language}...")
-        for i, chunk in enumerate(chunks):
-            translated_chunk = custom_translate(chunk)
-            translated_chunks.append(translated_chunk)
-            print(f"Chunk {i+1}/{len(chunks)} translated")
+        if len(text) <= max_length:
+            # Translate short text directly
+            prompt = f"Translate the following English text to Hindi. Only respond with the translation, nothing else:\n\n{text}"
+            response = model.generate_content(prompt)
+            translated_text = response.text
+        else:
+            # Split longer text into paragraphs instead of arbitrary chunks
+            paragraphs = text.split('\n\n')
+            translated_paragraphs = []
+            
+            # Translate each paragraph
+            for i, para in enumerate(paragraphs):
+                if para.strip():  # Skip empty paragraphs
+                    prompt = f"Translate the following English text to Hindi. Only respond with the translation, nothing else:\n\n{para}"
+                    try:
+                        response = model.generate_content(prompt)
+                        translated_para = response.text
+                        translated_paragraphs.append(translated_para)
+                        print(f"Paragraph {i+1}/{len(paragraphs)} translated")
+                    except Exception as para_error:
+                        print(f"Error translating paragraph {i+1}: {para_error}")
+                        # On error, keep the original paragraph
+                        translated_paragraphs.append(para)
+            
+            # Join the translated paragraphs back with the same structure
+            translated_text = '\n\n'.join(translated_paragraphs)
+        
+        # Save to cache
+        translation_cache[cache_key] = translated_text
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(translation_cache, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Error saving translation cache: {e}")
+        
+        return translated_text
         
     except Exception as e:
-        print(f"Error setting up translation: {str(e)}")
-        # Fallback to original text if entire translation process fails
-        return text
-    
-    # Step 3: Store the translated chunks
-    translation_record["translated_chunks"] = translated_chunks
-    translation_record["final_translation"] = " ".join(translated_chunks)
-    
-    # For debugging/tracking purposes
-    print(f"Translation {translation_id} complete")
-    
-    return translation_record["final_translation"]
+        print(f"Translation error with Gemini API: {e}")
+        
+        # Fallback to simplified translation using the Translator library
+        # This is less likely to timeout but may be less accurate
+        try:
+            translator = Translator(to_lang=target_language)
+            
+            # For very short texts
+            if len(text) < 100:
+                return translator.translate(text)
+                
+            # Split into smaller chunks for the translator
+            chunks = [text[i:i + 200] for i in range(0, len(text), 200)]
+            translated_chunks = []
+            
+            for chunk in chunks:
+                try:
+                    # Set a short timeout for each chunk
+                    translated_chunk = translator.translate(chunk)
+                    translated_chunks.append(translated_chunk)
+                except:
+                    # If a chunk fails, keep it untranslated
+                    translated_chunks.append(chunk)
+            
+            return " ".join(translated_chunks)
+            
+        except Exception as fallback_error:
+            print(f"Fallback translation failed: {fallback_error}")
+            # If all else fails, return original text
+            return text
 
-# if __name__ == "__main__":
-#     if not os.path.exists("static/audio"):
-#         os.makedirs("static/audio")
-#     # Add a print statement for debugging
-#     print("Starting TaleCraft AI Story Teller application...")
-#     app.run(debug=True, threaded=True, use_reloader=True, 
-#             host='0.0.0.0', 
-#             port=5000)
+if __name__ == "__main__":
+    if not os.path.exists("static/audio"):
+        os.makedirs("static/audio")
+    # Add a print statement for debugging
+    print("Starting TaleCraft AI Story Teller application...")
+    app.run(debug=True, threaded=True, use_reloader=True, 
+            host='0.0.0.0', 
+            port=5000)
