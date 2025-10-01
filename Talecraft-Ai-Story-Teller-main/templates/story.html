@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Story</title>
+    <style>
+        /* Add styles for the buttons */
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .translate-hindi {
+            background-color: #f4a261; /* Orange for Hindi translation */
+            color: white;
+        }
+        .translate-english {
+            background-color: #2a9d8f; /* Green for reverting to English */
+            color: white;
+        }
+        button:hover {
+            opacity: 0.8;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #2a9d8f;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .translation-progress {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e2f3f5;
+            border-radius: 5px;
+            display: none;
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #2a9d8f;
+            border-radius: 5px;
+            width: 0%;
+            transition: width 0.5s;
+        }
+    </style>
+</head>
+<body>
+    {% extends "base.html" %}
+
+    {% block content %}
+    <div class="max-w-3xl mx-auto bg-gray-100 rounded-lg p-6 ">
+        <h2 class="text-3xl font-bold text-green-700 mb-4">Here’s your story for {{ child_name }}:</h2>
+        <div id="story-content" class="prose max-w-none text-gray-800 whitespace-pre-line">
+            {{ story|safe }}
+        </div>
+        <br>
+        <button id="translate-btn" class="translate-hindi" onclick="changeLanguage('hi')">Translate to Hindi</button>
+        <button id="revert-btn" class="translate-english" onclick="changeLanguage('en')">Revert to English</button>
+        
+        <div id="translation-progress" class="translation-progress">
+            <div id="progress-message"></div>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+        </div>
+
+        <script>
+            let originalStory = `{{ story|safe }}`; // Store the original story in English
+            let isTranslating = false;
+            
+            // Check if the story was generated in Hindi by checking the language code
+            const languageCode = "{{ request.form.get('language_code') }}";
+            const isHindiSelected = languageCode === "hi-IN";
+            
+            // Hide translation buttons only if Hindi was selected for listening
+            document.addEventListener("DOMContentLoaded", () => {
+                console.log("Language code:", languageCode);
+                console.log("Is Hindi selected:", isHindiSelected);
+                
+                if (isHindiSelected) {
+                    document.getElementById('translate-btn').style.display = 'none';
+                    document.getElementById('revert-btn').style.display = 'none';
+                }
+            });
+            
+            function changeLanguage(language) {
+                const translateBtn = document.getElementById('translate-btn');
+                const revertBtn = document.getElementById('revert-btn');
+                const storyContent = document.getElementById('story-content');
+                const progressDiv = document.getElementById('translation-progress');
+                const progressMessage = document.getElementById('progress-message');
+                const progressFill = document.getElementById('progress-fill');
+                
+                // Prevent multiple translation requests
+                if (isTranslating) {
+                    return;
+                }
+                
+                // If reverting to English, use the original story
+                if (language === 'en') {
+                    storyContent.innerHTML = originalStory;
+                    return;
+                }
+                
+                // Show progress indicator
+                isTranslating = true;
+                progressDiv.style.display = 'block';
+                progressMessage.innerHTML = '<div class="spinner"></div> <span style="color: black;">Translating your story to Hindi...</span>';
+                progressFill.style.width = '10%';
+                
+                // Disable buttons during translation
+                translateBtn.disabled = true;
+                translateBtn.style.opacity = '0.5';
+                
+                // Create form data for POST request
+                const formData = new FormData();
+                formData.append('language', language);
+                formData.append('story', storyContent.innerText);
+                
+                // Show translation is in progress
+                const startTime = new Date().getTime();
+                
+                // Update progress animation
+                let progress = 10;
+                const progressInterval = setInterval(() => {
+                    if (progress < 90) {
+                        progress += 5;
+                        progressFill.style.width = `${progress}%`;
+                    }
+                }, 1000);
+                
+                // Fetch the translated story using POST
+                fetch('/translate_story', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    // Show completed progress
+                    progressFill.style.width = '100%';
+                    clearInterval(progressInterval);
+                    return response.json();
+                })
+                .then(data => {
+                    // Calculate actual time taken
+                    const endTime = new Date().getTime();
+                    const timeTaken = Math.round((endTime - startTime) / 1000);
+                    
+                    // Update story with translation
+                    storyContent.innerHTML = data.story;
+                    
+                    // Update progress message with success
+                    progressMessage.innerHTML = `<span style="color: green;">✓</span> Translation completed in ${timeTaken} seconds!`;
+                    
+                    // Hide progress after 3 seconds
+                    setTimeout(() => {
+                        progressDiv.style.display = 'none';
+                    }, 3000);
+                    
+                    // Re-enable translation button
+                    isTranslating = false;
+                    translateBtn.disabled = false;
+                    translateBtn.style.opacity = '1';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    
+                    // Show error message
+                    progressMessage.innerHTML = '<span style="color: red;">✗</span> Translation failed. Please try again.';
+                    progressFill.style.width = '100%';
+                    progressFill.style.backgroundColor = '#e74c3c';
+                    
+                    // Re-enable translation button
+                    isTranslating = false;
+                    translateBtn.disabled = false;
+                    translateBtn.style.opacity = '1';
+                    clearInterval(progressInterval);
+                });
+            }
+        </script>
+
+        {% if audio_file %}
+        <div class="mt-6">
+            <h3 class="text-xl text-green-600 font-semibold mb-2">Listen to the story:</h3>
+            <audio controls class="w-full">
+                <source src="{{ url_for('static', filename=audio_file.split('static/')[1]) }}" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+            <p class="mt-2">
+                <a href="{{ url_for('static', filename=audio_file.split('static/')[1]) }}" class="text-green-500 underline" download>
+                    Download Audio
+                </a>
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="text-center mt-6">
+        <a href="/" class="bg-green-700 hover:bg-green-800 text-white py-2 px-4 rounded font-semibold">
+            Create Another Story
+        </a>
+    </div>
+    {% endblock %}
+</body>
+</html>
